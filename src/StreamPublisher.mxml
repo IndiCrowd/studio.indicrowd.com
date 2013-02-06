@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
+				width="400" height="600" minWidth="400" minHeight="600" layout="absolute" initialize="init()" >
+	<mx:Script>
+		<![CDATA[
+			private var nc:NetConnection = null;
+			private var camera:Camera;
+			private var microphone:Microphone;
+			private var nsPublish:NetStream = null;     
+			private var connStr:String = "rtmp://localhost/live";
+			//private var connStr:String = "rtmp://localhost/videochat";
+			private var pubStreamStr:String = "myStream";
+			//private var pubStreamStr:String = "testing";
+			
+			
+			// Sett parametars
+			public function setConnStr(constr:String):void
+			{
+				connStr = constr;
+			}
+			
+			
+			public function setPubStreamStr(pubstr:String):void
+			{
+				pubStreamStr = pubstr;
+			}
+			
+			
+			private function init():void
+			{
+				var initSuccess:Boolean = startCamera();
+				connect();
+				
+				if (!initSuccess)
+				{
+					btnStartPublish.enabled = false;
+				}
+				
+				scanCamera();
+				
+				
+			}
+			
+			
+			private function doLive(event:MouseEvent):void
+			{
+				if (btnStartPublish.label == "방송하기")
+				{
+					startLive();
+				}
+				else
+				{
+					stopLive();
+				}
+			}
+			
+			private function startLive():void
+			{
+				startPublish();
+				btnStartPublish.label = "방송중지";
+				
+			}
+			private function stopLive():void
+			{
+				stopPublish();
+				btnStartPublish.label = "방송하기";
+			}
+			
+			private function scanCamera():void
+			{
+				//listCamera.dataProvider = Camera.names;
+				
+				
+				trace(Camera.names.length);
+				
+			}
+			
+			private function startCamera():Boolean
+			{	
+				// get the default Flash camera and microphone
+				camera = Camera.getCamera();
+				microphone = Microphone.getMicrophone();
+				
+				// here are all the quality and performance settings that we suggest
+				if(camera != null)
+				{
+					camera.setMode(240, 180, 15, false);
+					camera.setQuality(0, 88);
+					camera.setKeyFrameInterval(30);
+					
+					//videoCamera.clear();
+					videoCamera.attachCamera(camera);
+				}
+				else
+				{
+					//Alert.show("카메라가 설치되어 있지 않습니다.");
+					return false;
+				}
+				if( microphone != null)
+				{
+					microphone.rate = 11;
+					microphone.setSilenceLevel(0); 
+				}
+				else
+				{
+					//Alert.show("마이크가 설치되어 있지 않습니다.");
+					return false;
+				}
+				
+				return true;
+			}
+			
+			private function ncOnStatus(infoObject:NetStatusEvent):void
+			{
+				trace("nc: "+infoObject.info.code+" ("+infoObject.info.description+")");
+				//if (infoObject.info.code == "NetConnection.Connect.Failed")
+				//prompt.text = "Connection failed: Try rtmp://[server-ip-address]/videochat";
+				//else if (infoObject.info.code == "NetConnection.Connect.Rejected")
+				//prompt.text = infoObject.info.description;
+			}
+			
+			
+			private function connect():void
+			{
+				// connect to the Wowza Media Server
+				if (nc == null)
+				{
+					// create a connection to the wowza media server
+					nc = new NetConnection();
+					nc.connect(connStr);
+					
+					// get status information from the NetConnection object
+					nc.addEventListener(NetStatusEvent.NET_STATUS, ncOnStatus);
+					
+					//connect.connectButton.label = "Disconnect";
+					
+					// uncomment this to monitor frame rate and buffer length
+					setInterval(updateStreamValues, 500);
+					
+					
+				}
+			}
+			
+			private function disconnect():void
+			{
+				nsPublish = null;
+				
+				nc.close();
+				nc = null;
+			}
+			
+			
+			// function to monitor the frame rate and buffer length
+			private function updateStreamValues():void
+			{
+				if (nsPublish != null)
+				{
+					fpsText.text = (Math.round(nsPublish.currentFPS*1000)/1000)+" fps";
+					bufferLenText.text = (Math.round(nsPublish.bufferLength*1000)/1000)+" secs";
+				}
+				else
+				{
+					fpsText.text = "";
+					bufferLenText.text = "";
+				}
+			}
+			
+			private function nsPublishOnStatus(infoObject:NetStatusEvent):void
+			{
+				trace("nsPublish: "+infoObject.info.code+" ("+infoObject.info.description+")");
+				//if (infoObject.info.code == "NetStream.Play.StreamNotFound" || infoObject.info.code == "NetStream.Play.Failed")
+				//prompt.text = infoObject.info.description;
+			}
+			
+			private function startPublish():void
+			{
+				// create a new NetStream object for video publishing
+				nsPublish = new NetStream(nc);
+				
+				nsPublish.addEventListener(NetStatusEvent.NET_STATUS, nsPublishOnStatus);
+				
+				// set the buffer time to zero since it is chat
+				nsPublish.bufferTime = 0;
+				
+				// publish the stream by name
+				nsPublish.publish(pubStreamStr);
+				
+				// add custom metadata to the stream
+				var metaData:Object = new Object();
+				metaData["description"] = "Chat using VideoChat example."
+				nsPublish.send("@setDataFrame", "onMetaData", metaData);
+				
+				// attach the camera and microphone to the server
+				nsPublish.attachCamera(camera);
+				nsPublish.attachAudio(microphone);
+			}
+			
+			private function stopPublish():void
+			{
+				nsPublish.attachCamera(null);
+				nsPublish.attachAudio(null);
+				nsPublish.publish("null");
+				nsPublish.close();
+			}
+		]]>
+	</mx:Script>
+	<mx:VideoDisplay id="videoCamera" x="0" y="0" width="400" height="300" autoPlay="false"/>
+	<mx:TabNavigator x="10" y="365" width="361" height="216">
+		<mx:Canvas width="100%" height="100%" label="Tab 1">
+			<mx:Label x="10" y="10" text="카메라 : "/>
+			<mx:Label x="10" y="36" text="마이크 :"/>
+			<mx:List id="listCamera" x="57" y="10" height="114" dataProvider="{Camera.names}"></mx:List>
+		</mx:Canvas>
+	</mx:TabNavigator>
+	<mx:Button id="btnStartPublish" x="10" y="308" label="방송하기" click="doLive(event)"/>
+	<mx:Label id="fpsText" x="303" y="310" width="75"/>
+	<mx:Label id="bufferLenText" x="303" y="336" width="75"/>
+	
+</mx:Application>
