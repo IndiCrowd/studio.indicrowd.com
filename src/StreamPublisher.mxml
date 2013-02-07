@@ -21,11 +21,12 @@
 			
 			private var camWidth:uint = 640;
 			private var camHeight:uint = 480;
-			private var camFPS:uint = 20;
+			private var camFPS:uint = 30;
 			private var camQuality:uint = 88;
 			
 			private var micRateSel:Array = [ 5, 8, 11, 22, 44 ];
 			private var micRate:uint = 2;
+			private var micEncodeQuality:uint = 6;
 			
 			
 			[Bindable]
@@ -194,6 +195,7 @@
 					microphone = Microphone.getMicrophone(index);
 					
 					microphone.rate = micRateSel[micRate];
+					microphone.encodeQuality = micEncodeQuality;
 					microphone.setSilenceLevel(0); 
 					
 					
@@ -202,6 +204,7 @@
 				} else  {
 					
 					microphone.rate = micRateSel[micRate];
+					microphone.encodeQuality = micEncodeQuality;
 					microphone.setSilenceLevel(0); 
 				}
 				
@@ -366,6 +369,47 @@
 				
 				return "";
 			}
+			
+			
+			/* 캠 퀄리티 자동으로 변경 */
+			protected function cbCamQualityAuto_changeHandler(event:Event):void
+			{
+				if(cbCamQualityAuto.selected)
+				{
+					camQuality = 0;
+					slideCamQuality.enabled = false;
+				} else {
+					camQuality = slideCamQuality.value;
+					slideCamQuality.enabled = true;
+				}
+				
+				changeCamera();
+			}
+			
+			protected function slideMICEncodeQuality_changeHandler(event:SliderEvent):void
+			{
+				micEncodeQuality = slideMICEncodeQuality.value;
+				changeMIC();
+			}
+			
+			protected function slideMICEncodeQuality_initializeHandler(event:FlexEvent):void
+			{
+				slideMICEncodeQuality.value = micEncodeQuality;
+			}
+			
+			protected function cbCameraHD_changeHandler(event:Event):void
+			{
+				if (cbCameraHD.selected)
+				{
+					camHeight = 720;
+					camWidth = 1080;
+				} else {
+					camHeight = 480;
+					camWidth = 640;
+				}
+				changeCamera();
+			}
+			
 		]]>
 	</mx:Script>
 	<mx:VideoDisplay id="videoCamera" x="0" y="0" width="400" height="300" autoPlay="false"/>
@@ -389,6 +433,13 @@
 						initialize="slideMICQuality_initializeHandler(event)" maximum="4"
 						minimum="0" snapInterval="1" tickValues="[0,1,2,3,4] "
 						dataTipFormatFunction="micToolTipFunc" />
+			<mx:HSlider id="slideMICEncodeQuality" x="81" y="116"
+						change="slideMICEncodeQuality_changeHandler(event)" maximum="10" minimum="1"
+						snapInterval="1" initialize="slideMICEncodeQuality_initializeHandler(event)"/>
+			<mx:CheckBox id="cbCameraHD" x="305" y="10" label="HD"
+						 change="cbCameraHD_changeHandler(event)"/>
+			<mx:CheckBox id="cbCamQualityAuto" x="249" y="60" label="자동"
+						  change="cbCamQualityAuto_changeHandler(event)" />
 		</mx:Canvas>
 	</mx:TabNavigator>
 	<mx:Button id="btnStartPublish" x="10" y="308" label="방송하기" click="doLive(event)"/>
