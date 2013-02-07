@@ -25,6 +25,7 @@
 			private var camHeight:uint = 480;
 			private var camFPS:uint = 20;
 			private var camQuality:uint = 88;
+			private var camOnline:Boolean = true;
 			
 			private var micRateSel:Array = [ 5, 8, 11, 22, 44 ];
 			private var micRate:uint = 2;
@@ -311,7 +312,8 @@
 				nsPublish.send("@setDataFrame", "onMetaData", metaData);
 				
 				// attach the camera and microphone to the server
-				nsPublish.attachCamera(camera);
+				if (camOnline)
+					nsPublish.attachCamera(camera);
 				
 				if (!micMuted)
 					nsPublish.attachAudio(microphone);
@@ -452,6 +454,8 @@
 			
 			protected function cbMicMute_changeHandler(event:Event):void
 			{
+				micMuted = cbMicMute.selected;
+				
 				if (nsPublish != null)
 				{
 					if (cbMicMute.selected) 
@@ -466,6 +470,23 @@
 				
 			}
 			
+			protected function cbCamOnline_changeHandler(event:Event):void
+			{
+				camOnline = cbCamOnline.selected;
+				
+				if (nsPublish != null)
+				{
+					if (cbCamOnline.selected) 
+					{
+						nsPublish.attachCamera(null);
+					}
+					else 
+					{
+						nsPublish.attachCamera(camera);
+					}
+				}
+			}
+			
 		]]>
 	</mx:Script>
 	<mx:VideoDisplay id="videoCamera" x="0" y="0" width="400" height="300" autoPlay="false"/>
@@ -475,11 +496,12 @@
 			<mx:Label x="10" y="62" text="카메라 품질 : "/>
 			<mx:Label x="10" y="88" text="마이크 품질 : "/>
 			<mx:Label x="10" y="36" text="마이크 :"/>
-			<mx:ComboBox id="listCamera" x="60" y="8" change="listCamera_changeHandler(event)"
-						 dataProvider="{acCameraData}"
+			<mx:ComboBox id="listCamera" y="4" left="81" right="141"
+						 change="listCamera_changeHandler(event)" dataProvider="{acCameraData}"
 						 initialize="listCamera_initializeHandler(event)"></mx:ComboBox>
-			<mx:ComboBox id="listMIC" x="60" y="34" change="listMIC_changeHandler(event)"
-						 dataProvider="{acMICData}" initialize="listMIC_initializeHandler(event)"></mx:ComboBox>
+			<mx:ComboBox id="listMIC" y="34" left="81" right="136"
+						 change="listMIC_changeHandler(event)" dataProvider="{acMICData}"
+						 initialize="listMIC_initializeHandler(event)"></mx:ComboBox>
 			<mx:HSlider id="slideCamQuality" x="81" y="62"
 						change="slideCamQuality_changeHandler(event)"
 						initialize="slideCamQuality_initializeHandler(event)" maximum="100"
@@ -498,8 +520,8 @@
 						  change="cbCamQualityAuto_changeHandler(event)" />
 			<mx:Button id="btnHardwareScan" x="304" y="151" label="장치 탐색"
 					   click="btnHardwareScan_clickHandler(event)" enabled="false"/>
-			<mx:CheckBox id="cbMicMute" x="317" y="34" label="음소거"
-						 change="cbMicMute_changeHandler(event)"/>
+			<mx:CheckBox id="cbMicMute" x="62" y="36" change="cbMicMute_changeHandler(event)"/>
+			<mx:CheckBox id="cbCamOnline" x="62" y="8" change="cbCamOnline_changeHandler(event)"/>
 		</mx:Canvas>
 	</mx:TabNavigator>
 	<mx:Button id="btnStartPublish" x="10" y="308" label="방송하기" click="doLive(event)"/>
