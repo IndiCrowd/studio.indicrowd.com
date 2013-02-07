@@ -3,6 +3,12 @@
 				width="400" height="600" minWidth="400" minHeight="600" layout="absolute" initialize="init()" >
 	<mx:Script>
 		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.SliderEvent;
+			import mx.events.ToolTipEvent;
+			
 			private var nc:NetConnection = null;
 			private var camera:Camera;
 			private var microphone:Microphone;
@@ -13,19 +19,43 @@
 			//private var pubStreamStr:String = "testing";
 			
 			
-			// Sett parametars
+			private var camWidth:uint = 640;
+			private var camHeight:uint = 480;
+			private var camFPS:uint = 20;
+			private var camQuality:uint = 88;
+			
+			private var micRateSel:Array = [ 5, 8, 11, 22, 44 ];
+			private var micRate:uint = 2;
+			
+			
+			[Bindable]
+			private var acCameraData:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var acMICData:ArrayCollection = new ArrayCollection();
+			
+			/**
+			*  접속 링크 주소 설정 
+			*/
 			public function setConnStr(constr:String):void
 			{
 				connStr = constr;
 			}
 			
 			
+			/**
+			 * 전송 스트림 이름 설정 
+			 */
 			public function setPubStreamStr(pubstr:String):void
 			{
 				pubStreamStr = pubstr;
 			}
 			
 			
+			/**
+			 * 어플리케이션이 시작되면 무조건 호출되는 함수 
+			 * 
+			 */
 			private function init():void
 			{
 				var initSuccess:Boolean = startCamera();
@@ -35,13 +65,12 @@
 				{
 					btnStartPublish.enabled = false;
 				}
-				
-				scanCamera();
-				
-				
 			}
 			
-			
+			/**
+			 * 방송하기 버튼을 클릭하면 호출되는 함수
+			 * @event 마우스 클릭 이벤트 변
+			 */
 			private function doLive(event:MouseEvent):void
 			{
 				if (btnStartPublish.label == "방송하기")
@@ -54,12 +83,21 @@
 				}
 			}
 			
+			
+			/**
+			 * 방송 시작 
+			 * 
+			 */
 			private function startLive():void
 			{
 				startPublish();
 				btnStartPublish.label = "방송중지";
 				
 			}
+			
+			/**
+			 *  방송 정지 
+			 */
 			private function stopLive():void
 			{
 				stopPublish();
@@ -68,13 +106,33 @@
 			
 			private function scanCamera():void
 			{
-				//listCamera.dataProvider = Camera.names;
+				acCameraData.removeAll();
 				
+				var count:int = 0;
 				
-				trace(Camera.names.length);
+				for(var i:uint; i < Camera.names.length; i++)
+				{
+					var cam:Camera = Camera.getCamera( String(i) );
+					acCameraData.addItem( { label:cam.name, data:String(i) });
+				}
 				
+				trace("Camera List : " + Camera.names.toString());
 			}
 			
+			private function scanMIC():void
+			{
+				acMICData.removeAll();
+				
+				var count:int = 0;
+				
+				for(var i:uint; i < Microphone.names.length; i++)
+				{
+					var mic:Microphone = Microphone.getMicrophone(i);
+					acMICData.addItem( { label:mic.name, data:String(i) });
+				}
+			}
+			
+		
 			private function startCamera():Boolean
 			{	
 				// get the default Flash camera and microphone
@@ -84,12 +142,7 @@
 				// here are all the quality and performance settings that we suggest
 				if(camera != null)
 				{
-					camera.setMode(240, 180, 15, false);
-					camera.setQuality(0, 88);
-					camera.setKeyFrameInterval(30);
-					
-					//videoCamera.clear();
-					videoCamera.attachCamera(camera);
+					changeCamera(0);
 				}
 				else
 				{
@@ -98,8 +151,7 @@
 				}
 				if( microphone != null)
 				{
-					microphone.rate = 11;
-					microphone.setSilenceLevel(0); 
+					changeMIC(0);
 				}
 				else
 				{
@@ -108,6 +160,51 @@
 				}
 				
 				return true;
+			}
+			
+			
+			private function changeCamera(index:int = -1):void 
+			{
+				if (index != -1)
+				{
+					camera = Camera.getCamera(String(index));
+					
+					camera.setMode(camWidth, camHeight, camFPS, false);
+					camera.setQuality(0, camQuality);
+					camera.setKeyFrameInterval(30);
+					
+					videoCamera.attachCamera(camera);
+					
+					if (nsPublish != null)
+						nsPublish.attachCamera(camera);
+				} else {
+					
+					camera.setMode(camWidth, camHeight, camFPS, false);
+					camera.setQuality(0, camQuality);
+					camera.setKeyFrameInterval(30);
+				}
+				
+			}
+			
+			
+			private function changeMIC(index:int = -1):void 
+			{
+				if (index != -1)
+				{
+					microphone = Microphone.getMicrophone(index);
+					
+					microphone.rate = micRateSel[micRate];
+					microphone.setSilenceLevel(0); 
+					
+					
+					if (nsPublish != null)
+						nsPublish.attachAudio(microphone);
+				} else  {
+					
+					microphone.rate = micRateSel[micRate];
+					microphone.setSilenceLevel(0); 
+				}
+				
 			}
 			
 			private function ncOnStatus(infoObject:NetStatusEvent):void
@@ -202,14 +299,96 @@
 				nsPublish.publish("null");
 				nsPublish.close();
 			}
+			
+			protected function listCamera_initializeHandler(event:FlexEvent):void
+			{
+				scanCamera();
+			}
+			
+			protected function listCamera_changeHandler(event:ListEvent):void
+			{
+				changeCamera(event.currentTarget.selectedIndex);
+			}
+			
+			protected function listMIC_initializeHandler(event:FlexEvent):void
+			{
+				scanMIC();
+			}
+			
+			protected function listMIC_changeHandler(event:ListEvent):void
+			{
+				changeMIC(event.currentTarget.selectedIndex);
+			}
+			
+			protected function slideCamQuality_changeHandler(event:SliderEvent):void
+			{
+				camQuality = slideCamQuality.value;
+				
+				changeCamera();
+			}
+			
+			protected function slideCamQuality_initializeHandler(event:FlexEvent):void
+			{
+				slideCamQuality.value = camQuality;
+			}
+			
+			protected function slideMICQuality_changeHandler(event:SliderEvent):void
+			{
+				micRate = slideMICQuality.value;
+			
+				changeMIC();
+			}
+			
+			protected function slideMICQuality_initializeHandler(event:FlexEvent):void
+			{
+				slideMICQuality.value = micRate;
+			}
+			
+			private function micToolTipFunc(val:String):String {
+				switch(int(val))
+				{
+					case 0:
+						return "낮음";
+						break;
+					case 1:
+						return "약간낮음";
+						break;
+					case 2:
+						return "중간";
+						break;
+					case 3:
+						return "약간높음";
+						break;
+					case 4:
+						return "높음";
+						break;			
+				}
+				
+				return "";
+			}
 		]]>
 	</mx:Script>
 	<mx:VideoDisplay id="videoCamera" x="0" y="0" width="400" height="300" autoPlay="false"/>
 	<mx:TabNavigator x="10" y="365" width="361" height="216">
-		<mx:Canvas width="100%" height="100%" label="Tab 1">
+		<mx:Canvas width="100%" height="100%" label="하드웨어 설정">
 			<mx:Label x="10" y="10" text="카메라 : "/>
+			<mx:Label x="10" y="62" text="카메라 품질 : "/>
+			<mx:Label x="10" y="88" text="마이크 품질 : "/>
 			<mx:Label x="10" y="36" text="마이크 :"/>
-			<mx:List id="listCamera" x="57" y="10" height="114" dataProvider="{Camera.names}"></mx:List>
+			<mx:ComboBox id="listCamera" x="60" y="8" change="listCamera_changeHandler(event)"
+						 dataProvider="{acCameraData}"
+						 initialize="listCamera_initializeHandler(event)"></mx:ComboBox>
+			<mx:ComboBox id="listMIC" x="60" y="34" change="listMIC_changeHandler(event)"
+						 dataProvider="{acMICData}" initialize="listMIC_initializeHandler(event)"></mx:ComboBox>
+			<mx:HSlider id="slideCamQuality" x="81" y="62"
+						change="slideCamQuality_changeHandler(event)"
+						initialize="slideCamQuality_initializeHandler(event)" maximum="100"
+						minimum="1"/>
+			<mx:HSlider id="slideMICQuality" x="81" y="90"
+						change="slideMICQuality_changeHandler(event)"
+						initialize="slideMICQuality_initializeHandler(event)" maximum="4"
+						minimum="0" snapInterval="1" tickValues="[0,1,2,3,4] "
+						dataTipFormatFunction="micToolTipFunc" />
 		</mx:Canvas>
 	</mx:TabNavigator>
 	<mx:Button id="btnStartPublish" x="10" y="308" label="방송하기" click="doLive(event)"/>
