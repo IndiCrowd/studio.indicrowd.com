@@ -31,8 +31,9 @@
 			
 			private var micRateSel:Array = [ 5, 8, 11, 22, 44 ];
 			private var micRate:uint = 2;
-			private var micEncodeQuality:uint = 6;
-			private var micMuted:Boolean = false;
+			private var micEncodeQuality:uint = 10;
+			private var micPlay:Boolean = true;
+			private var micCodec:String = "Speex";
 			
 			private var handleUpdateCamValue:uint;
 			private var handleUpdateMICValue:uint;
@@ -67,7 +68,7 @@
 			 */
 			private function init():void
 			{
-				flash.media.scanHardware();
+				//flash.media.scanHardware();
 				var initSuccess:Boolean = startCamera();
 				
 				if (!initSuccess)
@@ -208,6 +209,8 @@
 				{
 					microphone = Microphone.getMicrophone(index);
 					
+					 
+					microphone.codec = micCodec;
 					microphone.rate = micRateSel[micRate];
 					microphone.encodeQuality = micEncodeQuality;
 					microphone.setSilenceLevel(0); 
@@ -314,7 +317,7 @@
 				if (camOnline)
 					nsPublish.attachCamera(camera);
 				
-				if (!micMuted)
+				if (micPlay)
 					nsPublish.attachAudio(microphone);
 			}
 			
@@ -451,19 +454,19 @@
 				}
 			}
 			
-			protected function cbMicMute_changeHandler(event:Event):void
+			protected function cbMicPlay_changeHandler(event:Event):void
 			{
-				micMuted = cbMicMute.selected;
+				micPlay = cbMicPlay.selected;
 				
 				if (nsPublish != null)
 				{
-					if (cbMicMute.selected) 
+					if (micPlay) 
 					{
-						nsPublish.attachAudio(null);
+						nsPublish.attachAudio(microphone);
 					}
 					else 
 					{
-						nsPublish.attachAudio(microphone);
+						nsPublish.attachAudio(null);
 					}
 				}
 				
@@ -475,15 +478,27 @@
 				
 				if (nsPublish != null)
 				{
-					if (cbCamOnline.selected) 
-					{
-						nsPublish.attachCamera(null);
-					}
-					else 
+					if (camOnline) 
 					{
 						nsPublish.attachCamera(camera);
 					}
+					else 
+					{
+						nsPublish.attachCamera(null);
+					}
 				}
+			}
+			
+			protected function cbMicCodec_clickHandler(event:MouseEvent):void
+			{
+				if (cbMicCodec.selected)
+				{
+					micCodec = "Nellymoser";
+				} else {
+					micCodec = "Speex";
+				}
+				
+				changeMIC();
 			}
 			
 		]]>
@@ -519,8 +534,12 @@
 						  change="cbCamQualityAuto_changeHandler(event)" />
 			<mx:Button id="btnHardwareScan" x="304" y="151" label="장치 탐색"
 					   click="btnHardwareScan_clickHandler(event)" enabled="false"/>
-			<mx:CheckBox id="cbMicMute" x="62" y="36" change="cbMicMute_changeHandler(event)"/>
-			<mx:CheckBox id="cbCamOnline" x="62" y="8" change="cbCamOnline_changeHandler(event)"/>
+			<mx:CheckBox id="cbMicPlay" x="62" y="36" change="cbMicPlay_changeHandler(event)"
+						 selected="true"/>
+			<mx:CheckBox id="cbCamOnline" x="62" y="8" change="cbCamOnline_changeHandler(event)"
+						 selected="true"/>
+			<mx:CheckBox id="cbMicCodec" x="312" y="34" label="Codec"
+						 click="cbMicCodec_clickHandler(event)"/>
 		</mx:Canvas>
 	</mx:TabNavigator>
 	<mx:Button id="btnStartPublish" x="10" y="308" label="방송하기" click="doLive(event)"/>
