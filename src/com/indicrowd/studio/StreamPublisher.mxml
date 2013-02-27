@@ -12,6 +12,7 @@
 			import mx.events.ListEvent;
 			import mx.events.SliderEvent;
 			import mx.events.ToolTipEvent;
+			import flash.external.*;
 			
 			private var nc:NetConnection = null;
 			private var camera:Camera;
@@ -46,14 +47,6 @@
 			[Bindable]
 			private var acMICData:ArrayCollection = new ArrayCollection();
 			
-			/**
-			*  접속 링크 주소 설정 
-			*/
-			public function setConnStr(constr:String):void
-			{
-				connStr = constr;
-			}
-			
 			
 			/**
 			 * 전송 스트림 이름 설정 
@@ -65,10 +58,19 @@
 			
 			
 			/**
+			 * 전송 스트림 이름 가져오기  
+			 */
+			public function getPubStreamStr():String
+			{
+				return pubStreamStr;
+			}
+			
+			
+			/**
 			 * 어플리케이션이 시작되면 무조건 호출되는 함수 
 			 * 
 			 */
-			private function init():void
+			public function init():void
 			{
 				//flash.media.scanHardware();
 				var initSuccess:Boolean = startCamera();
@@ -83,11 +85,15 @@
 				// 성능 주기적으로 출력 
 				handleUpdateCamValue = setInterval(updateStreamValues, 500);
 				handleUpdateMICValue = setInterval(updateMICValues, 100);
+				
+				// 외부 자바스크립트 호출 함수 등록  
+				ExternalInterface.addCallback("setPubStreamStr", setPubStreamStr);
+				ExternalInterface.addCallback("getPubStreamStr", getPubStreamStr);
 			}
 			
 			/**
 			 * 방송하기 버튼을 클릭하면 호출되는 함수
-			 * @event 마우스 클릭 이벤트 변
+			 * @event 마우스 클릭 이벤트 변경 
 			 */
 			private function doLive(event:MouseEvent):void
 			{
@@ -271,6 +277,9 @@
 			// function to monitor the frame rate and buffer length
 			private function updateStreamValues():void
 			{
+				if (fpsText == null || bufferLenText == null)
+					return ;
+				
 				if (nsPublish != null)
 				{
 					fpsText.text = (Math.round(nsPublish.currentFPS*1000)/1000)+" fps";
@@ -285,6 +294,9 @@
 			
 			private function updateMICValues():void
 			{
+				if (soundLevel == null)
+					return ;
+				
 				if (microphone != null)
 					soundLevel.text = String(microphone.activityLevel);
 				else
