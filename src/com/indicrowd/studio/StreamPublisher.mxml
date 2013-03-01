@@ -333,7 +333,7 @@
 				nsPublish.videoStreamSettings = h264Settings;
 				
 				// publish the stream by name
-				nsPublish.publish(pubStreamStr);
+				nsPublish.publish(pubStreamStr, "append");
 				
 				// add custom metadata to the stream
 				var metaData:Object = new Object();
