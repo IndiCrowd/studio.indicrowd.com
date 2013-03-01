@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
 				xmlns:ns1="*"
-				width="800" height="360" minWidth="480" minHeight="360" horizontalScrollPolicy="off"
+				width="480" height="360" minWidth="480" minHeight="360" horizontalScrollPolicy="off"
 				initialize="init()" layout="absolute" verticalScrollPolicy="off">
 	<mx:Script>
 		<![CDATA[
+			import flash.external.*;
 			import flash.media.scanHardware;
 			
 			import mx.collections.ArrayCollection;
+			import mx.core.FlexGlobals;
 			import mx.events.FlexEvent;
 			import mx.events.ListEvent;
 			import mx.events.SliderEvent;
 			import mx.events.ToolTipEvent;
-			import flash.external.*;
 			
 			private var nc:NetConnection = null;
 			private var camera:Camera;
@@ -20,7 +21,8 @@
 			private var nsPublish:NetStream = null;     
 			private var connStr:String = "rtmp://infty123.iptime.org/live";
 			//private var connStr:String = "rtmp://localhost/videochat";
-			private var pubStreamStr:String = "myStream";
+			[Bindable]
+			private var pubStreamStr:String;
 			//private var pubStreamStr:String = "testing";
 			
 			
@@ -39,7 +41,7 @@
 			private var handleUpdateCamValue:uint;
 			private var handleUpdateMICValue:uint;
 			
-			private var openSetting:Boolean = true;
+			private var openSetting:Boolean = false;
 			
 			[Bindable]
 			private var acCameraData:ArrayCollection = new ArrayCollection();
@@ -85,6 +87,9 @@
 				// 성능 주기적으로 출력 
 				handleUpdateCamValue = setInterval(updateStreamValues, 500);
 				handleUpdateMICValue = setInterval(updateMICValues, 100);
+				
+				// 시작 변수 받아오기 
+				pubStreamStr =  FlexGlobals.topLevelApplication.parameters.pubStreamStr;
 				
 				// 외부 자바스크립트 호출 함수 등록  
 				ExternalInterface.addCallback("setPubStreamStr", setPubStreamStr);
@@ -495,6 +500,7 @@
 				} else {
 					this.width = 800;	
 				}
+				flash.external.ExternalInterface.call("resizeStreamPublisher", this.width, this.height);
 			}
 			
 		]]>
