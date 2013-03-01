@@ -3,3 +3,5 @@ bin-release/
 bin/
 
 .settings/
+
+.DS_Store
