@@ -1,0 +1,5 @@
+bin-debug/
+bin-release/
+bin/
+
+.settings/
