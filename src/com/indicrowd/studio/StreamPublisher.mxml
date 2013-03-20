@@ -26,14 +26,14 @@
 			//private var pubStreamStr:String = "testing";
 			
 			
-			private var camWidth:uint = 640;
-			private var camHeight:uint = 480;
+			private var camWidth:uint = 480;
+			private var camHeight:uint = 360;
 			private var camFPS:uint = 20;
-			private var camQuality:uint = 88;
+			private var camQuality:uint = 100;
 			private var camOnline:Boolean = true;
 			
 			private var micRateSel:Array = [ 5, 8, 11, 22, 44 ];
-			private var micRate:uint = 2;
+			private var micRate:uint = 4;
 			private var micEncodeQuality:uint = 10;
 			private var micPlay:Boolean = true;
 			private var micCodec:String = SoundCodec.SPEEX;
@@ -448,8 +448,8 @@
 					camHeight = 720;
 					camWidth = 1280;
 				} else {
-					camHeight = 480;
-					camWidth = 640;
+					camHeight = 360;
+					camWidth = 480;
 				}
 				changeCamera();
 			}
