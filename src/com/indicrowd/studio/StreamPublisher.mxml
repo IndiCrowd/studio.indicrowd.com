@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
-				xmlns:ns1="*"
+<mx:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx"
 				width="480" height="360" minWidth="480" minHeight="360" horizontalScrollPolicy="off"
 				initialize="init()" layout="absolute" verticalScrollPolicy="off">
-	<mx:Script>
+	<fx:Script>
 		<![CDATA[
 			import flash.external.*;
+			import mx.rpc.events.ResultEvent;
 			import flash.media.scanHardware;
 			
 			import mx.collections.ArrayCollection;
@@ -15,15 +17,17 @@
 			import mx.events.SliderEvent;
 			import mx.events.ToolTipEvent;
 			
+			[Bindable]
+			private var serverInfoURL:String = "/server/optimal";
+			private var urlPrefix:String = "/IndiCrowd";
+			
 			private var nc:NetConnection = null;
 			private var camera:Camera;
 			private var microphone:Microphone;
-			private var nsPublish:NetStream = null;     
-			private var connStr:String = "rtmp://infty123.iptime.org/live";
-			//private var connStr:String = "rtmp://localhost/videochat";
+			private var nsPublish:NetStream = null;  
+			private var connStr:String;
 			[Bindable]
 			private var pubStreamStr:String;
-			//private var pubStreamStr:String = "testing";
 			
 			
 			private var camWidth:uint = 480;
@@ -90,10 +94,14 @@
 				
 				// 시작 변수 받아오기 
 				pubStreamStr =  FlexGlobals.topLevelApplication.parameters.pubStreamStr;
+				urlPrefix =  FlexGlobals.topLevelApplication.parameters.urlPrefix;
+				serverInfoURL = urlPrefix + serverInfoURL;
 				
 				// 외부 자바스크립트 호출 함수 등록  
 				ExternalInterface.addCallback("setPubStreamStr", setPubStreamStr);
 				ExternalInterface.addCallback("getPubStreamStr", getPubStreamStr);
+				
+				serverInfoService.send();
 			}
 			
 			/**
@@ -326,8 +334,8 @@
 				nsPublish.bufferTime = 0;
 				
 				var h264Settings:H264VideoStreamSettings = new H264VideoStreamSettings();
-				h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_5_1);
-				h264Settings.setQuality(0, 0);
+				h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_3);
+				h264Settings.setQuality(0, camQuality);
 				h264Settings.setKeyFrameInterval(15);
 				h264Settings.setMode(camWidth, camHeight, camFPS);
 				nsPublish.videoStreamSettings = h264Settings;
@@ -503,8 +511,25 @@
 				flash.external.ExternalInterface.call("resizeStreamPublisher", this.width, this.height);
 			}
 			
+			
+			private function readServerInfo(event:ResultEvent):void
+			{				
+				var result:Object = JSON.parse(event.result as String);
+				
+				connStr = "rtmp://" + result.command.hostname + ":" + result.command.rtmpPort + "/live";
+			}
+			
 		]]>
-	</mx:Script>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:HTTPService id="serverInfoService" url="{serverInfoURL}" useProxy="false" method="GET" result="readServerInfo(event)" showBusyCursor="true">
+			<mx:request xmlns="">
+			</mx:request>
+		</mx:HTTPService>
+	</fx:Declarations>
+	
 	<mx:VideoDisplay id="videoCamera" x="0" y="0" width="480" height="360" autoPlay="false"/>
 	<mx:TabNavigator x="480" y="0" width="320" height="360">
 		<mx:Canvas width="100%" height="100%" label="하드웨어 설정">
