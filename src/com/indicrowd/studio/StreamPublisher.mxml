@@ -18,7 +18,7 @@
 			import mx.events.ToolTipEvent;
 			
 			[Bindable]
-			private var serverInfoURL:String = "/server/optimal";
+			private var serverInfoURL:String = "/server/streaming/optimal.json";
 			private var urlPrefix:String = "/IndiCrowd";
 			
 			private var nc:NetConnection = null;
@@ -85,12 +85,6 @@
 				{
 					btnStartPublish.enabled = false;
 				}
-				
-				connect();
-				
-				// 성능 주기적으로 출력 
-				handleUpdateCamValue = setInterval(updateStreamValues, 500);
-				handleUpdateMICValue = setInterval(updateMICValues, 100);
 				
 				// 시작 변수 받아오기 
 				pubStreamStr =  FlexGlobals.topLevelApplication.parameters.pubStreamStr;
@@ -517,6 +511,12 @@
 				var result:Object = JSON.parse(event.result as String);
 				
 				connStr = "rtmp://" + result.command.hostname + ":" + result.command.rtmpPort + "/live";
+				
+				connect();
+				
+				// 성능 주기적으로 출력 
+				handleUpdateCamValue = setInterval(updateStreamValues, 500);
+				handleUpdateMICValue = setInterval(updateMICValues, 100);
 			}
 			
 		]]>
@@ -569,7 +569,7 @@
 	</mx:TabNavigator>
 	<mx:Canvas x="0" y="328" width="480" height="32" alpha="1.0" backgroundAlpha="0.0">
 		<mx:Button id="btnStartPublish" x="10" y="5" label="방송하기" click="doLive(event)"/>
-		<mx:Button id="btnSetting" x="429" y="5" label="설정" click="btnSetting_clickHandler(event)"/>
+		<mx:Button id="btnSetting" x="398" y="5" label="설정" click="btnSetting_clickHandler(event)"/>
 	</mx:Canvas>
 	
 </mx:Application>
