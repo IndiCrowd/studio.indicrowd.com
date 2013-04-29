@@ -7,7 +7,6 @@
 	<fx:Script>
 		<![CDATA[
 			import flash.external.*;
-			import mx.rpc.events.ResultEvent;
 			import flash.media.scanHardware;
 			
 			import mx.collections.ArrayCollection;
@@ -16,9 +15,12 @@
 			import mx.events.ListEvent;
 			import mx.events.SliderEvent;
 			import mx.events.ToolTipEvent;
+			import mx.rpc.events.ResultEvent;
 			
 			[Bindable]
 			private var serverInfoURL:String = "/server/streaming/optimal.json";
+			[Bindable]
+			private var concertStateURL:String = "/concert/${concertId}/state.json";
 			private var urlPrefix:String = "/IndiCrowd";
 			
 			private var nc:NetConnection = null;
@@ -90,12 +92,18 @@
 				pubStreamStr =  FlexGlobals.topLevelApplication.parameters.pubStreamStr;
 				urlPrefix =  FlexGlobals.topLevelApplication.parameters.urlPrefix;
 				serverInfoURL = urlPrefix + serverInfoURL;
+				concertStateURL = urlPrefix + concertStateURL;
+				concertStateURL = concertStateURL.replace("${concertId}", pubStreamStr);
+				
+				trace(concertStateURL);
 				
 				// 외부 자바스크립트 호출 함수 등록  
 				ExternalInterface.addCallback("setPubStreamStr", setPubStreamStr);
 				ExternalInterface.addCallback("getPubStreamStr", getPubStreamStr);
+				ExternalInterface.addCallback("changeState", changeState);
 				
 				serverInfoService.send();
+				concertStateService.send();
 			}
 			
 			/**
@@ -104,6 +112,7 @@
 			 */
 			private function doLive(event:MouseEvent):void
 			{
+				btnStartPublish.enabled = false;
 				if (btnStartPublish.label == "방송하기")
 				{
 					startLive();
@@ -112,6 +121,7 @@
 				{
 					stopLive();
 				}
+				btnStartPublish.enabled = true;
 			}
 			
 			
@@ -248,10 +258,18 @@
 			{
 				trace("nc: "+infoObject.info.code+" ("+infoObject.info.description+")");
 				
-				if (infoObject.info.code == "NetConnection.Connect.Failed")
+				if (infoObject.info.code == "NetStream.Publish.Denied") {
+					trace("System can't publish live movie!");
+					stopLive();
+					mx.controls.Alert.show("방송 가능 시간이 아닙니다!!");
+				}
+				else if (infoObject.info.code == "NetConnection.Connect.Failed")
 				{
+					trace("System can't publish live movie!");
 					// 접속 실패
 				} else if (infoObject.info.code == "NetConnection.Connect.Rejected") {
+					trace("System can't publish live movie!");
+					//mx.controls.Alert.show("방송 가능 시간이 아닙니다!!");
 					// 연결 거부
 				}
 			}
@@ -315,6 +333,7 @@
 				trace("nsPublish: "+infoObject.info.code+" ("+infoObject.info.description+")");
 				//if (infoObject.info.code == "NetStream.Play.StreamNotFound" || infoObject.info.code == "NetStream.Play.Failed")
 				//prompt.text = infoObject.info.description;
+				
 			}
 			
 			private function startPublish():void
@@ -352,11 +371,13 @@
 			
 			private function stopPublish():void
 			{
-				nsPublish.attachCamera(null);
-				nsPublish.attachAudio(null);
-				nsPublish.publish("null");
-				nsPublish.close();
-				nsPublish = null;
+				if(nsPublish != null) {
+					nsPublish.attachCamera(null);
+					nsPublish.attachAudio(null);
+					nsPublish.publish("null");
+					nsPublish.close();
+					nsPublish = null;
+				}
 			}
 			
 			protected function listCamera_initializeHandler(event:FlexEvent):void
@@ -510,7 +531,8 @@
 			{				
 				var result:Object = JSON.parse(event.result as String);
 				
-				connStr = "rtmp://" + result.command.hostname + ":" + result.command.rtmpPort + "/live";
+				//connStr = "rtmp://" + result.command.hostname + ":" + result.command.rtmpPort + "/live";
+				connStr = "rtmp://localhost/live";
 				
 				connect();
 				
@@ -519,12 +541,45 @@
 				handleUpdateMICValue = setInterval(updateMICValues, 100);
 			}
 			
+			
+			private function changeState(state:String):void {
+				
+				if (state == "PLAYING" || state == "ENCORE")
+				{
+					canvasWaiting.visible = false;
+					canvasPublish.visible = true;
+				} else if (state == "RESERVE" || state == "REHEARSAL") {
+					canvasWaiting.visible = true;
+					canvasPublish.visible = false;
+					lblWaitingText.text = "공연까지 아직 시간이 남았습니다.";
+				} else if (state == "END") {
+					canvasWaiting.visible = true;
+					canvasPublish.visible = false;
+					lblWaitingText.text = "공연이 끝났습니다.";
+				} else {
+					canvasWaiting.visible = true;
+					canvasPublish.visible = false;
+					lblWaitingText.text = "공연이 실패하였습니다.";
+				}
+			}
+			
+			
+			private function readConcertState(event:ResultEvent):void
+			{				
+				var result:Object = JSON.parse(event.result as String);
+				
+				changeState(result.command);
+			}
 		]]>
 	</fx:Script>
 	
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 		<mx:HTTPService id="serverInfoService" url="{serverInfoURL}" useProxy="false" method="GET" result="readServerInfo(event)" showBusyCursor="true">
+			<mx:request xmlns="">
+			</mx:request>
+		</mx:HTTPService>
+		<mx:HTTPService id="concertStateService" url="{concertStateURL}" useProxy="false" method="GET" result="readConcertState(event)" showBusyCursor="true">
 			<mx:request xmlns="">
 			</mx:request>
 		</mx:HTTPService>
@@ -567,9 +622,12 @@
 			<mx:Label id="soundLevel" x="57" y="69" width="75"/>
 		</mx:Canvas>
 	</mx:TabNavigator>
-	<mx:Canvas x="0" y="328" width="480" height="32" alpha="1.0" backgroundAlpha="0.0">
+	<mx:Canvas id="canvasPublish" x="0" y="328" width="480" height="32" alpha="1.0" backgroundAlpha="0.0">
 		<mx:Button id="btnStartPublish" x="10" y="5" label="방송하기" click="doLive(event)"/>
 		<mx:Button id="btnSetting" x="398" y="5" label="설정" click="btnSetting_clickHandler(event)"/>
+	</mx:Canvas>
+	<mx:Canvas id="canvasWaiting" backgroundColor="#F3FDFE" x="0" y="328" width="480" height="32" alpha="1.0" backgroundAlpha="1.0">
+		<mx:Label id="lblWaitingText" x="5" y="5" width="470" height="22" />
 	</mx:Canvas>
 	
 </mx:Application>
