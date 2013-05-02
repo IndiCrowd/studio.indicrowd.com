@@ -2,12 +2,13 @@
 <mx:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
 				xmlns:s="library://ns.adobe.com/flex/spark"
 				xmlns:mx="library://ns.adobe.com/flex/mx"
-				width="480" height="360" minWidth="480" minHeight="360" horizontalScrollPolicy="off"
+				width="800" height="360" minWidth="480" minHeight="360" horizontalScrollPolicy="off"
 				initialize="init()" layout="absolute" verticalScrollPolicy="off">
 	<fx:Script>
 		<![CDATA[
 			import flash.external.*;
 			import flash.media.scanHardware;
+			import flash.utils.setInterval;
 			
 			import mx.collections.ArrayCollection;
 			import mx.core.FlexGlobals;
@@ -21,6 +22,8 @@
 			private var serverInfoURL:String = "/server/streaming/optimal.json";
 			[Bindable]
 			private var concertStateURL:String = "/concert/${concertId}/state.json";
+			[Bindable]
+			private var remainTimeURL:String = "/concert/${concertId}/remainTime.json";
 			private var urlPrefix:String = "/IndiCrowd";
 			
 			private var nc:NetConnection = null;
@@ -31,6 +34,7 @@
 			[Bindable]
 			private var pubStreamStr:String;
 			
+			private var remainTime:int = 0;
 			
 			private var camWidth:uint = 480;
 			private var camHeight:uint = 360;
@@ -46,6 +50,7 @@
 			
 			private var handleUpdateCamValue:uint;
 			private var handleUpdateMICValue:uint;
+			private var handleUpdateRemainTime:uint;
 			
 			private var openSetting:Boolean = false;
 			
@@ -94,8 +99,12 @@
 				serverInfoURL = urlPrefix + serverInfoURL;
 				concertStateURL = urlPrefix + concertStateURL;
 				concertStateURL = concertStateURL.replace("${concertId}", pubStreamStr);
+				remainTimeURL = urlPrefix + remainTimeURL;
+				remainTimeURL = remainTimeURL.replace("${concertId}", pubStreamStr);
 				
 				trace(concertStateURL);
+				
+				handleUpdateRemainTime = setInterval(updateRemainTime, 1000);
 				
 				// 외부 자바스크립트 호출 함수 등록  
 				ExternalInterface.addCallback("setPubStreamStr", setPubStreamStr);
@@ -104,6 +113,7 @@
 				
 				serverInfoService.send();
 				concertStateService.send();
+				remainTimeService.send();
 			}
 			
 			/**
@@ -186,7 +196,7 @@
 				}
 				else
 				{
-					//Alert.show("카메라가 설치되어 있지 않습니다.");
+					mx.controls.Alert.show("카메라가 설치되어 있지 않습니다.");
 					return false;
 				}
 				if( microphone != null)
@@ -195,7 +205,7 @@
 				}
 				else
 				{
-					//Alert.show("마이크가 설치되어 있지 않습니다.");
+					mx.controls.Alert.show("마이크가 설치되어 있지 않습니다.");
 					return false;
 				}
 				
@@ -265,10 +275,12 @@
 				}
 				else if (infoObject.info.code == "NetConnection.Connect.Failed")
 				{
-					trace("System can't publish live movie!");
+					boxError.visible = true;
+					trace("NetConnection.Connect.Failed");
 					// 접속 실패
 				} else if (infoObject.info.code == "NetConnection.Connect.Rejected") {
-					trace("System can't publish live movie!");
+					trace("NetConnection.Connect.Rejected");
+					boxError.visible = true;
 					//mx.controls.Alert.show("방송 가능 시간이 아닙니다!!");
 					// 연결 거부
 				}
@@ -283,6 +295,7 @@
 					// create a connection to the wowza media server
 					nc = new NetConnection();
 					nc.connect(connStr);
+					trace("Connect : " + connStr);
 					
 					// get status information from the NetConnection object
 					nc.addEventListener(NetStatusEvent.NET_STATUS, ncOnStatus);
@@ -328,11 +341,53 @@
 					soundLevel.text = "";
 			}
 			
+			private function updateRemainTime():void
+			{
+				var remainTimeText:String = "";
+				this.remainTime++;
+				var remainTime:int = this.remainTime < 0 ? -this.remainTime : this.remainTime;
+				
+				if (this.remainTime < 0)
+				{
+					remainTimeText = "-";
+				}
+				
+				var hours:int = remainTime / 3600;
+				var minutes:int = (remainTime % 3600 ) / 60 ;
+				var seconds:int = (remainTime % 3600 ) % 60;
+				
+				if (hours != 0)
+				{
+					if ( hours < 10 ) {
+						remainTimeText += "0";
+					}
+					remainTimeText += hours + ":";
+				}
+				
+				
+				if ( minutes < 10 ) {
+					remainTimeText += "0";
+				}
+				remainTimeText += minutes + ":";
+				
+				
+				if ( seconds < 10 ) {
+					remainTimeText += "0";
+				}
+				remainTimeText += seconds;
+				
+				lblReaminTime.text = remainTimeText;
+			}
+			
 			private function nsPublishOnStatus(infoObject:NetStatusEvent):void
 			{
 				trace("nsPublish: "+infoObject.info.code+" ("+infoObject.info.description+")");
 				//if (infoObject.info.code == "NetStream.Play.StreamNotFound" || infoObject.info.code == "NetStream.Play.Failed")
 				//prompt.text = infoObject.info.description;
+				
+				if (infoObject.info.code == "NetStream.Publish.Start") {
+					lblLiveMark.visible = true;
+				}
 				
 			}
 			
@@ -378,6 +433,9 @@
 					nsPublish.close();
 					nsPublish = null;
 				}
+				
+				
+				lblLiveMark.visible = false;
 			}
 			
 			protected function listCamera_initializeHandler(event:FlexEvent):void
@@ -531,8 +589,8 @@
 			{				
 				var result:Object = JSON.parse(event.result as String);
 				
-				//connStr = "rtmp://" + result.command.hostname + ":" + result.command.rtmpPort + "/live";
-				connStr = "rtmp://localhost/live";
+				connStr = "rtmp://" + result.command.hostname + ":" + result.command.rtmpPort + "/live";
+				//connStr = "rtmp://localhost/live";
 				
 				connect();
 				
@@ -544,23 +602,32 @@
 			
 			private function changeState(state:String):void {
 				
+				boxEnd.visible = false;
+				
 				if (state == "PLAYING" || state == "ENCORE")
 				{
 					canvasWaiting.visible = false;
 					canvasPublish.visible = true;
+					lblReaminTime.setStyle("color", "#FF0000");
 				} else if (state == "RESERVE" || state == "REHEARSAL") {
 					canvasWaiting.visible = true;
 					canvasPublish.visible = false;
+					lblReaminTime.setStyle("color", "#00FF00");
 					lblWaitingText.text = "공연까지 아직 시간이 남았습니다.";
 				} else if (state == "END") {
 					canvasWaiting.visible = true;
 					canvasPublish.visible = false;
+					boxEnd.visible = true;
+					lblReaminTime.setStyle("color", "#0000FF");
+					remainTime = remainTime < 0 ? remainTime * -1 : remainTime;
 					lblWaitingText.text = "공연이 끝났습니다.";
 				} else {
 					canvasWaiting.visible = true;
 					canvasPublish.visible = false;
 					lblWaitingText.text = "공연이 실패하였습니다.";
 				}
+				
+				remainTimeService.send();
 			}
 			
 			
@@ -569,6 +636,16 @@
 				var result:Object = JSON.parse(event.result as String);
 				
 				changeState(result.command);
+			}
+			
+			
+			private function readRemainTime(event:ResultEvent):void
+			{				
+				var result:Object = JSON.parse(event.result as String);
+				
+				// 시각 등록
+				remainTime =  parseInt(result.long) / 1000 * -1;
+				trace("remainTime : " + remainTime);
 			}
 		]]>
 	</fx:Script>
@@ -580,6 +657,10 @@
 			</mx:request>
 		</mx:HTTPService>
 		<mx:HTTPService id="concertStateService" url="{concertStateURL}" useProxy="false" method="GET" result="readConcertState(event)" showBusyCursor="true">
+			<mx:request xmlns="">
+			</mx:request>
+		</mx:HTTPService>
+		<mx:HTTPService id="remainTimeService" url="{remainTimeURL}" useProxy="false" method="GET" result="readRemainTime(event)" showBusyCursor="true">
 			<mx:request xmlns="">
 			</mx:request>
 		</mx:HTTPService>
@@ -607,7 +688,7 @@
 						initialize="slideMICQuality_initializeHandler(event)" maximum="4"
 						minimum="0" snapInterval="1" tickValues="[0,1,2,3,4] "
 						dataTipFormatFunction="micToolTipFunc" />
-			<mx:CheckBox id="cbCameraHD" x="249" y="6" label="HD"
+			<mx:CheckBox id="cbCameraHD" visible="false" x="249" y="6" label="HD"
 						 change="cbCameraHD_changeHandler(event)"/>
 			<mx:CheckBox id="cbCamQualityAuto" x="249" y="61" label="자동"
 						  change="cbCamQualityAuto_changeHandler(event)" />
@@ -630,4 +711,30 @@
 		<mx:Label id="lblWaitingText" x="5" y="5" width="470" height="22" />
 	</mx:Canvas>
 	
+	<mx:Box id="boxRemainTime" x="397" y="10" width="75" height="25" label="00:00"
+			backgroundColor="#FFFFFF" cornerRadius="7" fontFamily="Arial" fontWeight="bold"
+			horizontalAlign="center" horizontalScrollPolicy="off" textAlign="center"
+			verticalAlign="middle" verticalScrollPolicy="off"> 
+		<mx:Label id="lblReaminTime"
+				 color="#000000" fontFamily="Arial" fontSize="16" fontWeight="bold" text="00:00"
+				 textAlign="center"/>
+	</mx:Box>
+	<s:Label id="lblLiveMark" visible="false" x="0" y="0" width="60" height="31"
+			 backgroundColor="#FF0000" color="#FFFFFF" fontFamily="Arial" fontSize="16"
+			 fontWeight="bold" text="LIVE" textAlign="center" verticalAlign="middle"/>
+	<mx:Box id="boxEnd" x="96" y="85" width="277" height="167"
+			backgroundAlpha="0.47" backgroundColor="#0000FF" cornerRadius="20" fontFamily="Arial" fontWeight="bold"
+			horizontalAlign="center" horizontalScrollPolicy="off" textAlign="center"
+			verticalAlign="middle" verticalScrollPolicy="off"> 
+		<s:Label id="lblEndMark" visible="true" color="#FFFFFF" fontFamily="Arial"
+				 fontSize="60" fontWeight="bold" text="방송종료" textAlign="center" verticalAlign="middle"/>
+		 
+	</mx:Box>
+	<mx:Box id="boxError" x="96" y="85" width="277" height="167" backgroundAlpha="0.47"
+			backgroundColor="#0000FF" cornerRadius="20" fontFamily="Arial" fontWeight="bold"
+			horizontalAlign="center" horizontalScrollPolicy="off" textAlign="center"
+			verticalAlign="middle" verticalScrollPolicy="off" visible="false">
+		<s:Label id="lblEndMark0" visible="true" color="#FFFFFF" fontFamily="Arial"
+				 fontSize="12" fontWeight="bold" text="통신 상황이 좋지 않습니다. &#xd;인터넷 상태를 다시 확인하시고 리프레쉬해주세요. &#xd;반복해서 발생하면 관리자에게 연락해주세요." textAlign="center" verticalAlign="middle"/>
+	</mx:Box>
 </mx:Application>
