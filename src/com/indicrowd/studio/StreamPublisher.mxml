@@ -305,6 +305,9 @@
 			
 			private function disconnect():void
 			{
+				if (nsPublish != null)
+					stopPublish();
+				
 				nsPublish = null;
 				
 				nc.close();
@@ -615,9 +618,12 @@
 					lblReaminTime.setStyle("color", "#00FF00");
 					lblWaitingText.text = "공연까지 아직 시간이 남았습니다.";
 				} else if (state == "END") {
+					stopLive();
+					disconnect();
 					canvasWaiting.visible = true;
 					canvasPublish.visible = false;
 					boxRemainTime.visible = false;
+					lblLiveMark.visible = false;
 					boxEnd.visible = true;
 					lblReaminTime.setStyle("color", "#0000FF");
 					remainTime = remainTime < 0 ? remainTime : remainTime;
@@ -625,6 +631,7 @@
 				} else {
 					canvasWaiting.visible = true;
 					canvasPublish.visible = false;
+					lblLiveMark.visible = false;
 					lblWaitingText.text = "공연이 실패하였습니다.";
 				}
 				
