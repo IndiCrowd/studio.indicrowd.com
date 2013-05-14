@@ -38,7 +38,7 @@
 			
 			private var camWidth:uint = 480;
 			private var camHeight:uint = 360;
-			private var camFPS:uint = 20;
+			private var camFPS:uint = 28;
 			private var camQuality:uint = 100;
 			private var camOnline:Boolean = true;
 			
@@ -405,7 +405,7 @@
 				nsPublish.bufferTime = 0;
 				
 				var h264Settings:H264VideoStreamSettings = new H264VideoStreamSettings();
-				h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_3);
+				h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_4);
 				h264Settings.setQuality(0, camQuality);
 				h264Settings.setKeyFrameInterval(15);
 				h264Settings.setMode(camWidth, camHeight, camFPS);
