@@ -24,6 +24,8 @@
 			private var concertStateURL:String = "/concert/${concertId}/state.json";
 			[Bindable]
 			private var remainTimeURL:String = "/concert/${concertId}/remainTime.json";
+			[Bindable]
+			private var chatServiceURL:String = "/concert/chat.json";
 			private var urlPrefix:String = "/IndiCrowd";
 			
 			private var nc:NetConnection = null;
@@ -36,15 +38,16 @@
 			
 			private var remainTime:int = 0;
 			
-			private var camWidth:uint = 480;
-			private var camHeight:uint = 360;
-			private var camFPS:uint = 28;
+			private var camWidth:uint = 640;
+			private var camHeight:uint = 480;
+			private var camFPS:uint = 26;
 			private var camQuality:uint = 100;
 			private var camOnline:Boolean = true;
 			
 			private var micRateSel:Array = [ 5, 8, 11, 22, 44 ];
 			private var micRate:uint = 4;
 			private var micEncodeQuality:uint = 10;
+			private var micEncodeGain:Number = 50;
 			private var micPlay:Boolean = true;
 			private var micCodec:String = SoundCodec.SPEEX;
 			
@@ -101,6 +104,7 @@
 				concertStateURL = concertStateURL.replace("${concertId}", pubStreamStr);
 				remainTimeURL = urlPrefix + remainTimeURL;
 				remainTimeURL = remainTimeURL.replace("${concertId}", pubStreamStr);
+				chatServiceURL = urlPrefix + chatServiceURL;
 				
 				trace(concertStateURL);
 				
@@ -114,6 +118,16 @@
 				serverInfoService.send();
 				concertStateService.send();
 				remainTimeService.send();
+			}
+			
+			
+			
+			private function sendChatMessage(message:String):void {
+				var params:Object = new Object();
+				params.concertId = pubStreamStr;
+				params.content = message;
+				
+				sendChatService.send(params);
 			}
 			
 			/**
@@ -142,6 +156,7 @@
 			private function startLive():void
 			{
 				startPublish();
+				sendChatMessage("<font style=\"font-weight:bold;color:#aa0000;\">[공지] 방송이 시작되었습니다~!</font>");
 				btnStartPublish.label = "방송중지";
 			}
 			
@@ -150,7 +165,12 @@
 			 */
 			private function stopLive():void
 			{
+				if (nsPublish != null)
+				{
+					sendChatMessage("<font style=\"font-weight: bold;color:#aa0000;\">[공지] 방송이 끝났습니다~!</font>");
+				}
 				stopPublish();
+				
 				btnStartPublish.label = "방송하기";
 			}
 			
@@ -177,7 +197,7 @@
 				
 				for(var i:uint; i < Microphone.names.length; i++)
 				{
-					var mic:Microphone = Microphone.getMicrophone(i);
+					var mic:Microphone = Microphone.getEnhancedMicrophone(i);
 					acMICData.addItem( { label:mic.name, data:String(i) });
 				}
 			}
@@ -187,7 +207,7 @@
 			{	
 				// get the default Flash camera and microphone
 				camera = Camera.getCamera();
-				microphone = Microphone.getMicrophone();
+				microphone = Microphone.getEnhancedMicrophone();
 				
 				// here are all the quality and performance settings that we suggest
 				if(camera != null)
@@ -218,23 +238,28 @@
 				if (index != -1)
 				{
 					camera = Camera.getCamera(String(index));
-					
-					camera.setMode(camWidth, camHeight, camFPS, false);
-					camera.setQuality(0, camQuality);
-					camera.setKeyFrameInterval(30);
-		
-					
 					videoCamera.attachCamera(camera);
-					
-					if (nsPublish != null)
-						nsPublish.attachCamera(camera);
-				} 
-				else 
+				}			
+			
+				
+				camera.setKeyFrameInterval(48);
+				camera.setMode(camWidth, camHeight, camFPS, false);
+				camera.setQuality(0, camQuality);
+				
+				if (nsPublish != null)
 				{
-					camera.setMode(camWidth, camHeight, camFPS, false);
-					camera.setQuality(0, camQuality);
-					camera.setKeyFrameInterval(30);
+					var h264Settings:H264VideoStreamSettings = new H264VideoStreamSettings();
+					h264Settings.setProfileLevel(H264Profile.MAIN, H264Level.LEVEL_4);
+					h264Settings.setQuality(0, camQuality);
+					h264Settings.setKeyFrameInterval(48);
+					h264Settings.setMode(camWidth, camHeight, camFPS);
+					nsPublish.videoStreamSettings = h264Settings;
+					
+					if ( index != -1 ){
+						nsPublish.attachCamera(camera);
+					}
 				}
+				
 				
 			}
 			
@@ -243,23 +268,29 @@
 			{
 				if (index != -1)
 				{
-					microphone = Microphone.getMicrophone(index);
-					
-					 
-					microphone.codec = micCodec;
-					microphone.rate = micRateSel[micRate];
-					microphone.encodeQuality = micEncodeQuality;
-					microphone.setSilenceLevel(0); 
-					
-					
-					if (nsPublish != null)
-						nsPublish.attachAudio(microphone);	
+					microphone = Microphone.getEnhancedMicrophone(index);
 				}
-				else 
+				
+				microphone.codec = micCodec;
+				microphone.rate = micRateSel[micRate];
+				microphone.encodeQuality = micEncodeQuality;
+				microphone.gain = micEncodeGain;
+				microphone.setSilenceLevel(0); 
+				microphone.setUseEchoSuppression(true);
+			
+				
+				var options:MicrophoneEnhancedOptions = new MicrophoneEnhancedOptions();
+				options.mode = MicrophoneEnhancedMode.HALF_DUPLEX;
+				options.autoGain = true;
+				options.nonLinearProcessing = false;
+				options.isVoiceDetected = -1;
+				microphone.enhancedOptions = options;
+				
+				
+				if (nsPublish != null)
 				{
-					microphone.rate = micRateSel[micRate];
-					microphone.encodeQuality = micEncodeQuality;
-					microphone.setSilenceLevel(0); 
+					nsPublish.attachAudio(microphone);	
+				} else {
 				}
 				
 			}
@@ -283,6 +314,9 @@
 					boxError.visible = true;
 					//mx.controls.Alert.show("방송 가능 시간이 아닙니다!!");
 					// 연결 거부
+				} else if (infoObject.info.code == "NetConnection.Connect.Closed") {
+					stopLive();
+					boxError.visible = true;	
 				}
 			}
 			
@@ -306,7 +340,7 @@
 			private function disconnect():void
 			{
 				if (nsPublish != null)
-					stopPublish();
+					stopLive();
 				
 				nsPublish = null;
 				
@@ -339,9 +373,15 @@
 					return ;
 				
 				if (microphone != null)
-					soundLevel.text = String(microphone.activityLevel);
-				else
-					soundLevel.text = "";
+				{
+					var alevel:int = microphone.activityLevel;
+					if (alevel == -1)
+					{
+						soundLevel.text = "동작안함";
+					} else {
+						soundLevel.text = String(alevel);
+					}
+				}
 			}
 			
 			private function updateRemainTime():void
@@ -405,9 +445,9 @@
 				nsPublish.bufferTime = 0;
 				
 				var h264Settings:H264VideoStreamSettings = new H264VideoStreamSettings();
-				h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_4);
+				h264Settings.setProfileLevel(H264Profile.MAIN, H264Level.LEVEL_4);
 				h264Settings.setQuality(0, camQuality);
-				h264Settings.setKeyFrameInterval(15);
+				h264Settings.setKeyFrameInterval(48);
 				h264Settings.setMode(camWidth, camHeight, camFPS);
 				nsPublish.videoStreamSettings = h264Settings;
 				
@@ -480,6 +520,17 @@
 				changeMIC();
 			}
 			
+			protected function slideMICGain_initializeHandler(event:FlexEvent):void
+			{
+				slideMICGain.value =  micEncodeGain;		
+			}
+			
+			protected function slideMICGain_changeHandler(event:SliderEvent):void
+			{
+				micEncodeGain = slideMICGain.value;
+				changeMIC();
+			}
+			
 			protected function slideMICQuality_initializeHandler(event:FlexEvent):void
 			{
 				slideMICQuality.value = micRate;
@@ -532,7 +583,7 @@
 					camHeight = 720;
 					camWidth = 1280;
 				} else {
-					camHeight = 360;
+					camHeight = 640;
 					camWidth = 480;
 				}
 				changeCamera();
@@ -612,6 +663,11 @@
 					canvasWaiting.visible = false;
 					canvasPublish.visible = true;
 					lblReaminTime.setStyle("color", "#FF0000");
+					
+					if (cbAutoLive.selected) {
+						startLive();
+					}
+					
 				} else if (state == "RESERVE" || state == "REHEARSAL") {
 					canvasWaiting.visible = true;
 					canvasPublish.visible = false;
@@ -655,6 +711,8 @@
 				remainTime =  parseInt(result.long) / 1000 * -1;
 				trace("remainTime : " + remainTime);
 			}
+			
+			
 		]]>
 	</fx:Script>
 	
@@ -672,6 +730,10 @@
 			<mx:request xmlns="">
 			</mx:request>
 		</mx:HTTPService>
+		<s:HTTPService id="sendChatService" url="{chatServiceURL}" useProxy="false" method="POST" showBusyCursor="false">
+			<mx:request xmlns="">
+			</mx:request>
+		</s:HTTPService>
 	</fx:Declarations>
 	
 	<mx:VideoDisplay id="videoCamera" x="0" y="0" width="480" height="360" autoPlay="false"/>
@@ -679,7 +741,9 @@
 		<mx:Canvas width="100%" height="100%" label="하드웨어 설정">
 			<mx:Label x="10" y="10" text="카메라 : "/>
 			<mx:Label x="10" y="62" text="카메라 품질 : "/>
-			<mx:Label x="10" y="88" text="마이크 품질 : "/>
+			<mx:Label x="10" y="92" text="마이크 품질 : "/>
+			<mx:Label x="10" y="120" text="마이크 증폭 : "/>
+			<mx:Label x="10" y="149" text="마이크 감도 :"/>
 			<mx:Label x="10" y="36" text="마이크 :"/>
 			<mx:ComboBox id="listCamera" y="4" left="81" width="160"
 						 change="listCamera_changeHandler(event)" dataProvider="{acCameraData}"
@@ -696,6 +760,11 @@
 						initialize="slideMICQuality_initializeHandler(event)" maximum="4"
 						minimum="0" snapInterval="1" tickValues="[0,1,2,3,4] "
 						dataTipFormatFunction="micToolTipFunc" />
+			<mx:HSlider id="slideMICGain" x="81" y="118"
+						change="slideMICGain_changeHandler(event)"
+						initialize="slideMICGain_initializeHandler(event)"
+						maximum="100"
+						minimum="0" snapInterval="0.01" tickInterval="10"/>
 			<mx:CheckBox id="cbCameraHD" visible="false" x="249" y="6" label="HD"
 						 change="cbCameraHD_changeHandler(event)"/>
 			<mx:CheckBox id="cbCamQualityAuto" x="249" y="61" label="자동"
@@ -704,19 +773,19 @@
 						 selected="true"/>
 			<mx:CheckBox id="cbCamOnline" x="62" y="8" change="cbCamOnline_changeHandler(event)"
 						 selected="true"/>
+			<mx:Label id="soundLevel" x="83" y="148" width="75"/>
 		</mx:Canvas>
 		<mx:Canvas width="100%" height="100%" label="디버깅 콘솔">
 			<mx:Label id="fpsText" x="57" y="17" width="75"/>
 			<mx:Label id="bufferLenText" x="57" y="43" width="75"/>
-			<mx:Label id="soundLevel" x="57" y="69" width="75"/>
 		</mx:Canvas>
 	</mx:TabNavigator>
 	<mx:Canvas id="canvasPublish" x="0" y="328" width="480" height="32" alpha="1.0" backgroundAlpha="0.0">
 		<mx:Button id="btnStartPublish" x="10" y="5" label="방송하기" click="doLive(event)"/>
-		<mx:Button id="btnSetting" x="398" y="5" label="설정" click="btnSetting_clickHandler(event)"/>
 	</mx:Canvas>
 	<mx:Canvas id="canvasWaiting" backgroundColor="#F3FDFE" x="0" y="328" width="480" height="32" alpha="1.0" backgroundAlpha="1.0">
 		<mx:Label id="lblWaitingText" x="5" y="5" width="470" height="22" />
+		<mx:CheckBox id="cbAutoLive" x="309" y="7" label="자동방송시작"/>
 	</mx:Canvas>
 	
 	<mx:Box id="boxRemainTime" x="397" y="10" width="75" height="25" label="00:00"
@@ -745,4 +814,5 @@
 		<s:Label id="lblEndMark0" visible="true" color="#FFFFFF" fontFamily="Arial"
 				 fontSize="12" fontWeight="bold" text="통신 상황이 좋지 않습니다. &#xd;인터넷 상태를 다시 확인하시고 리프레쉬해주세요. &#xd;반복해서 발생하면 관리자에게 연락해주세요." textAlign="center" verticalAlign="middle"/>
 	</mx:Box>
+	<mx:Button id="btnSetting" x="398" y="333" label="설정" click="btnSetting_clickHandler(event)"/>
 </mx:Application>
