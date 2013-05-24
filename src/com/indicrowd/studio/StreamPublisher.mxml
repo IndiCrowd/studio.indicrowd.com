@@ -55,6 +55,8 @@
 			private var handleUpdateMICValue:uint;
 			private var handleUpdateRemainTime:uint;
 			
+			private var showedTutorial:Boolean = false;
+			
 			private var openSetting:Boolean = false;
 			
 			[Bindable]
@@ -156,6 +158,7 @@
 			private function startLive():void
 			{
 				startPublish();
+				changeMIC();
 				sendChatMessage("<font style=\"font-weight:bold;color:#aa0000;\">[공지] 방송이 시작되었습니다~!</font>");
 				btnStartPublish.label = "방송중지";
 			}
@@ -170,7 +173,7 @@
 					sendChatMessage("<font style=\"font-weight: bold;color:#aa0000;\">[공지] 방송이 끝났습니다~!</font>");
 				}
 				stopPublish();
-				
+				changeMIC();
 				btnStartPublish.label = "방송하기";
 			}
 			
@@ -243,13 +246,21 @@
 			
 				
 				camera.setKeyFrameInterval(48);
-				camera.setMode(camWidth, camHeight, camFPS, false);
+				camera.setMode(camWidth, camHeight, camFPS);
 				camera.setQuality(0, camQuality);
 				
 				if (nsPublish != null)
 				{
+					/*
+					var streamSetting:VideoStreamSettings = new VideoStreamSettings();
+					streamSetting.setQuality(0, camQuality);
+					streamSetting.setKeyFrameInterval(48);
+					streamSetting.setMode(camWidth, camHeight, camFPS);
+					nsPublish.videoStreamSettings = streamSetting;
+					*/
+					
 					var h264Settings:H264VideoStreamSettings = new H264VideoStreamSettings();
-					h264Settings.setProfileLevel(H264Profile.MAIN, H264Level.LEVEL_4);
+					h264Settings.setProfileLevel(H264Profile.MAIN, H264Level.LEVEL_3_2);
 					h264Settings.setQuality(0, camQuality);
 					h264Settings.setKeyFrameInterval(48);
 					h264Settings.setMode(camWidth, camHeight, camFPS);
@@ -289,9 +300,14 @@
 				
 				if (nsPublish != null)
 				{
+					microphone.setLoopBack(false);
 					nsPublish.attachAudio(microphone);	
 				} else {
+					microphone.soundTransform = new SoundTransform(0, 0);
+					microphone.setLoopBack(true);
 				}
+				
+				trace("MIC vol : " + microphone.soundTransform.volume)
 				
 			}
 			
@@ -442,14 +458,23 @@
 				nsPublish.addEventListener(NetStatusEvent.NET_STATUS, nsPublishOnStatus);
 				
 				// set the buffer time to zero since it is chat
-				nsPublish.bufferTime = 0;
+				nsPublish.bufferTime = 1;
+				
+				//nsPublish.audioSampleAccess = true;
+				/*
+				var streamSetting:VideoStreamSettings = new VideoStreamSettings();
+				streamSetting.setQuality(0, camQuality);
+				streamSetting.setKeyFrameInterval(48);
+				streamSetting.setMode(camWidth, camHeight, camFPS);
+				nsPublish.videoStreamSettings = streamSetting;
+				*/
 				
 				var h264Settings:H264VideoStreamSettings = new H264VideoStreamSettings();
-				h264Settings.setProfileLevel(H264Profile.MAIN, H264Level.LEVEL_4);
+				h264Settings.setProfileLevel(H264Profile.MAIN, H264Level.LEVEL_3_2);
 				h264Settings.setQuality(0, camQuality);
 				h264Settings.setKeyFrameInterval(48);
 				h264Settings.setMode(camWidth, camHeight, camFPS);
-				nsPublish.videoStreamSettings = h264Settings;
+				nsPublish.videoStreamSettings = h264Settings;		
 				
 				// publish the stream by name
 				nsPublish.publish(pubStreamStr, "append");
@@ -653,6 +678,25 @@
 				handleUpdateMICValue = setInterval(updateMICValues, 100);
 			}
 			
+			private function showTutorial(state:String):void
+			{
+				if(!showedTutorial)
+				{
+					
+					if (state == "PLAYING" || state == "ENCORE") {
+						playing_tutorial.visible = true;
+					} else if (state == "RESERVE" || state == "REHEARSAL") {
+						rehearsal_tutorial.visible = true;
+					}
+				}
+				
+				showedTutorial = true;
+			}
+			
+			private function closeTutorial(event:MouseEvent):void {
+				playing_tutorial.visible = false;
+				rehearsal_tutorial.visible = false;
+			}
 			
 			private function changeState(state:String):void {
 				
@@ -691,6 +735,7 @@
 					lblWaitingText.text = "공연이 실패하였습니다.";
 				}
 				
+				showTutorial(state);
 				remainTimeService.send();
 			}
 			
@@ -815,4 +860,8 @@
 				 fontSize="12" fontWeight="bold" text="통신 상황이 좋지 않습니다. &#xd;인터넷 상태를 다시 확인하시고 리프레쉬해주세요. &#xd;반복해서 발생하면 관리자에게 연락해주세요." textAlign="center" verticalAlign="middle"/>
 	</mx:Box>
 	<mx:Button id="btnSetting" x="398" y="333" label="설정" click="btnSetting_clickHandler(event)"/>
+	
+	
+	<mx:Image id="playing_tutorial" source="@Embed(source='assets/playing_tutorial.png')" width="480" height="360" visible="false" click="closeTutorial(event)" />
+	<mx:Image id="rehearsal_tutorial" source="@Embed(source='assets/rehearsal_tutorial.png')" width="480" height="360" visible="false" click="closeTutorial(event)" />
 </mx:Application>
