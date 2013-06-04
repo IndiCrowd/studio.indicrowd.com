@@ -43,7 +43,7 @@
 			
 			private var camWidth:uint = 640;
 			private var camHeight:uint = 480;
-			private var camFPS:uint = 26;
+			private var camFPS:uint = 30;
 			private var camQuality:uint = 100;
 			private var camOnline:Boolean = true;
 			
@@ -134,6 +134,7 @@
 				var params:Object = new Object();
 				params.concertId = pubStreamStr;
 				params.content = message;
+				params.type = "notice";
 				
 				sendChatService.send(params);
 			}
@@ -165,7 +166,7 @@
 			{
 				startPublish();
 				changeMIC();
-				sendChatMessage("<font style=\"font-weight:bold;color:#aa0000;\">[공지] 방송이 시작되었습니다~!</font>");
+				sendChatMessage("[공지] 방송이 시작되었습니다~!");
 				btnStartPublish.label = "방송중지";
 			}
 			
@@ -176,7 +177,7 @@
 			{
 				if (nsPublish != null)
 				{
-					sendChatMessage("<font style=\"font-weight: bold;color:#aa0000;\">[공지] 방송이 끝났습니다~!</font>");
+					sendChatMessage("[공지] 방송이 끝났습니다~!");
 				}
 				stopPublish();
 				changeMIC();
